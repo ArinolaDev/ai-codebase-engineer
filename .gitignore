@@ -1,0 +1,29 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Env / secrets
+.env
+*.env.local
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Data (never commit user-uploaded/cloned repos or generated indexes)
+data/repos/*
+!data/repos/.gitkeep
+data/indexes/*
+!data/indexes/.gitkeep
+
+# DB
+*.sqlite3
+
+# OS/editor
+.DS_Store
+.vscode/
+*.log

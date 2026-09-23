@@ -1,0 +1,24 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic
+pydantic-settings
+sqlalchemy
+psycopg2-binary
+alembic
+
+# ingestion
+gitpython
+
+# parsing
+tree-sitter
+tree-sitter-languages
+
+# indexing / embeddings
+chromadb
+anthropic
+tiktoken
+
+# utils
+python-dotenv
+httpx
