@@ -20,14 +20,21 @@ Notes:
 ---
 
 ## Phase 1 — Codebase Ingestion
-⬜ Accept a local folder upload (zip) → extract into `data/repos/<project_id>`
-⬜ Accept a Git URL → clone via `gitpython` or shell `git clone`
-⬜ File walker: respects `.gitignore`, skips binaries/node_modules/venv/etc.
-⬜ Language detection per file (extension + shebang fallback)
-⬜ Persist project metadata (id, source, languages found, file count) in DB
+✅ Accept a local folder upload (zip) → extract into `data/repos/<project_id>`
+✅ Accept a Git URL → clone via `gitpython`
+✅ File walker: skips binaries/node_modules/venv/build dirs/oversized files
+✅ Language detection per file (extension-based)
+⬜ Persist project metadata (id, source, languages found, file count) in DB —
+   deferred: currently stateless, re-walks disk on every summary request.
+   Fine for now, revisit once we have Postgres wired up for real.
 
 Notes:
--
+- Tested live against a real GitHub repo (plant-disease-detector) via
+  `/api/projects/from-git` — returned correct file count + language
+  breakdown through the Swagger UI (/docs). Working end to end.
+- `.gitignore`-respecting walk not implemented yet — we use a hardcoded
+  SKIP_DIRS set instead, which is good enough for now but doesn't honor a
+  project's own .gitignore rules. Note for later polish.
 
 ---
 

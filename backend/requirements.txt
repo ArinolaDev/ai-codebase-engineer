@@ -1,24 +1,29 @@
+# --- Web framework ---
 fastapi
 uvicorn[standard]
 python-multipart
+
+# --- Data / validation ---
 pydantic
 pydantic-settings
+
+# --- Database ---
 sqlalchemy
 psycopg2-binary
 alembic
 
-# ingestion
+# --- Ingestion ---
 gitpython
 
-# parsing
+# --- Parsing (AST) ---
 tree-sitter
 tree-sitter-languages
 
-# indexing / embeddings
+# --- Indexing / embeddings ---
 chromadb
 anthropic
 tiktoken
 
-# utils
+# --- Utils ---
 python-dotenv
 httpx
