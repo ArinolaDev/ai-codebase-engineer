@@ -16,8 +16,10 @@ alembic
 gitpython
 
 # --- Parsing (AST) ---
-tree-sitter
-tree-sitter-languages
+# Pinned: tree-sitter-languages 1.10.2 is incompatible with tree-sitter >=0.22
+# (Language.__init__ signature changed). Keep these versions in lockstep.
+tree-sitter==0.21.3
+tree-sitter-languages==1.10.2
 
 # --- Indexing / embeddings ---
 chromadb
