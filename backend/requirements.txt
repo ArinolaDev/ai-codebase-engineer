@@ -23,7 +23,8 @@ tree-sitter-languages==1.10.2
 
 # --- Indexing / embeddings ---
 chromadb
-anthropic
+sentence-transformers   # free local embeddings, no API key needed
+anthropic                # optional — only needed once we add LLM-based chat/analysis
 tiktoken
 
 # --- Utils ---
