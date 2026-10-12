@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api import projects, parsing_routes, indexing_routes, chat_routes
+from app.api import projects, parsing_routes, indexing_routes, chat_routes, analysis_routes
 
 app = FastAPI(title="AI Codebase Engineer", version="0.1.0")
 
@@ -18,6 +18,7 @@ app.include_router(projects.router, prefix="/api/projects", tags=["projects"])
 app.include_router(parsing_routes.router, prefix="/api/projects", tags=["parsing"])
 app.include_router(indexing_routes.router, prefix="/api/projects", tags=["indexing"])
 app.include_router(chat_routes.router, prefix="/api/projects", tags=["chat"])
+app.include_router(analysis_routes.router, prefix="/api/projects", tags=["analysis"])
 
 
 @app.get("/health")
