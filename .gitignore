@@ -15,10 +15,19 @@ frontend/dist/
 frontend/.vite/
 
 # Data (never commit user-uploaded/cloned repos or generated indexes)
+# NOTE: patterns containing a slash are anchored to the repo root, so the
+# backend/ versions are required — our data folders live inside backend/.
 data/repos/*
 !data/repos/.gitkeep
 data/indexes/*
 !data/indexes/.gitkeep
+backend/data/repos/*
+!backend/data/repos/.gitkeep
+backend/data/indexes/*
+!backend/data/indexes/.gitkeep
+
+# Local test artifacts
+*.zip
 
 # DB
 *.sqlite3

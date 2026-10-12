@@ -39,60 +39,145 @@ Notes:
 ---
 
 ## Phase 2 — Parsing (AST layer)
-⬜ Integrate `tree-sitter` with grammars for Python, JS/TS, Java, C/C++
-   (tree-sitter is the right call here — one consistent API across languages,
-   incremental parsing, well-maintained)
-⬜ Build a language-agnostic "symbol" representation: functions, classes,
-   imports, calls — normalized across languages so downstream code doesn't
-   care which language it came from
-⬜ Extract per-file: definitions, imports, function signatures, docstrings
-⬜ Build a dependency graph: file → file (imports), function → function (calls)
+✅ Integrate `tree-sitter` for Python (JS/TS/Java/C++ deferred — see notes)
+⬜ Build a language-agnostic "symbol" representation normalized across
+   languages — currently Python-specific dataclasses; revisit once we add
+   a second language, so we don't guess the right abstraction prematurely
+✅ Extract per-file: function/class definitions, imports, parameters,
+   docstrings, line ranges
+⬜ Build a dependency graph: file → file (imports), function → function
+   (calls) — this is Phase 3 territory now; imports are extracted but not
+   yet resolved into an actual graph
 
 Notes:
--
+- Deliberately went Python-first instead of all languages at once — proved
+  the architecture end-to-end before expanding scope. Right call: hit and
+  fixed a real version-compat issue (see below) that would've been more
+  confusing to debug across multiple language integrations at once.
+- KNOWN ISSUE (fixed): `tree-sitter-languages==1.10.2` is incompatible with
+  `tree-sitter>=0.22` — the `Language.__init__` signature changed and
+  breaks `get_parser()`/`get_language()` with
+  `TypeError: __init__() takes exactly 1 argument (2 given)`.
+  Fix: pin `tree-sitter==0.21.3` + `tree-sitter-languages==1.10.2` together
+  in requirements.txt. Do not upgrade either independently.
+- Verified live against plant-disease-detector's app.py: correctly
+  extracted function name, exact line range, params, and all imports with
+  line numbers via GET /api/projects/{id}/parse.
+- Next language to add (when we get there): JavaScript/TypeScript, since
+  tree-sitter-languages already bundles that grammar — same pattern as
+  python_parser.py, new file js_parser.py.
 
 ---
 
 ## Phase 3 — Indexing (retrieval layer)
-⬜ Chunking strategy — chunk by function/class, not fixed token windows
-   (this matters a lot for code; naive chunking breaks context badly)
-⬜ Generate embeddings for each chunk (start with a hosted embedding model)
-⬜ Store in vector DB, keyed to project_id + file path + line range
-⬜ Store the dependency graph separately (Postgres or even just JSON/NetworkX
-   graph) — retrieval will combine semantic search + graph traversal
-⬜ Hybrid retrieval: semantic search for "what's relevant" + graph traversal
-   for "what depends on this"
+✅ Chunking strategy — chunk by function/class, not fixed token windows
+✅ Generate embeddings for each chunk — using free local model
+   (sentence-transformers, all-MiniLM-L6-v2), NOT a hosted/paid API
+✅ Store in vector DB (Chroma, local/file-persisted), keyed to project_id +
+   file path + line range
+⬜ Store the dependency graph separately (file→file imports, function→
+   function calls) — deferred, semantic search alone is working well for
+   now; revisit when codebase chat needs multi-hop questions like "what
+   depends on X"
+⬜ Hybrid retrieval (semantic + graph) — depends on the graph above
 
 Notes:
--
+- Went with sentence-transformers over a hosted embedding API specifically
+  to avoid Anthropic API costs during development — zero marginal cost,
+  fully offline after first model download (~90MB, one-time).
+- Verified live: natural-language query "load the model" correctly
+  matched the `load_model()` function in app.py by MEANING, not keyword
+  overlap — confirms semantic search is actually working, not just
+  returning things that share words with the query.
+- KNOWN ISSUE (fixed): chromadb's delete_collection() raises different
+  exception types across versions for "collection doesn't exist"
+  (NotFoundError in our installed version, not ValueError as docs/older
+  examples suggest). reset_project_index() now catches bare Exception to
+  cover this across versions.
+- Chunk count was lower than expected on first real test (1 chunk for 2
+  files) — worth a quick sanity check later: confirm train_plant.py
+  actually only has 1 parseable function, vs. the parser silently missing
+  something. Not blocking, just a flag for later.
+- Terminal gremlin (not a code issue): PowerShell was glob-expanding
+  --reload-exclude "data/*" into a literal matched path (data\repos),
+  breaking the uvicorn command. Fixed by using --reload-dir app instead of
+  an exclude pattern — sidesteps the glob entirely. Use --reload-dir app
+  as the standard way to run the dev server from now on.
 
 ---
 
 ## Phase 4 — Codebase Chat (RAG Q&A)
-⬜ Basic RAG: question → retrieve relevant chunks → answer with citations
-   (file:line references, not vague prose)
-⬜ Multi-hop questions: "which files depend on UserService" needs graph
-   traversal, not just semantic search — route queries appropriately
-⬜ Conversation memory within a session (follow-up questions about same code)
-⬜ Test against a real medium-sized open source repo, not a toy example
+✅ Basic RAG: question → retrieve relevant chunks (Phase 3 search) → LLM
+   answers grounded ONLY in retrieved context, with file:line citations
+⬜ Multi-hop questions ("which files depend on X") — needs the dependency
+   graph from Phase 3, still deferred
+⬜ Conversation memory within a session — currently stateless, each
+   question is independent. Fine for now; add if follow-up Qs feel broken
+⬜ Test against a real medium-sized open source repo — only tested against
+   our small 2-file test repo so far; worth trying something bigger once
+   JS/multi-language support exists, to see how retrieval holds up at scale
 
 Notes:
--
+- Built a pluggable LLM client (app/core/llm_client.py) that talks to
+  local Ollama — zero API cost, fully offline. Interface is generate(),
+  intentionally shaped so an AnthropicClient with the same interface can
+  be swapped in later via config, without touching chat_service.py.
+- Using llama3.2:1b (already pulled locally) — small/fast but not the
+  smartest model. Good enough to prove the architecture works; swap to a
+  bigger local model (qwen2.5-coder, llama3.1:8b) later if answer quality
+  needs to improve and the machine can handle it.
+- System prompt explicitly instructs the model to answer ONLY from
+  retrieved context and say so if it can't — this is what keeps answers
+  grounded instead of hallucinated. Worth stress-testing later: ask it
+  something the repo genuinely doesn't cover, confirm it admits it
+  doesn't know rather than making something up.
+- VERIFIED LIVE: asked "How is the model loaded in this project?" against
+  the real test repo. Got back an accurate, concise answer correctly
+  citing load_model() in app.py lines 17-18 — not a vague/generic answer,
+  genuinely grounded in the actual retrieved code.
+- Known gotcha (user error, not a bug): Swagger UI's parameter field can
+  end up containing the placeholder label text itself (e.g.
+  "project_id: 9e626a75ee59") if typed carelessly — causes a 404 since
+  it searches for a project with that literal string as its id. Always
+  make sure path params contain ONLY the raw value.
 
 ---
 
 ## Phase 5 — Bug / Issue Detection
-⬜ Start with pattern-based static checks (SQL injection via string
-   formatting, hardcoded secrets, obvious null-deref patterns) — cheap,
-   reliable, no LLM needed for these
+✅ Pattern-based static checks (no LLM): hardcoded secrets/keys, SQL built
+   from dynamic strings, eval/exec, os.system/shell=True, pickle/yaml.load,
+   weak hashes, verify=False, debug=True, bare except, mutable defaults
 ⬜ Layer LLM-based review on top for things static analysis misses (logic
    bugs, bad error handling, race conditions) — feed it function + its
    callers/callees from the graph for context
-⬜ Output format: file, line range, severity, explanation, suggested fix
-⬜ De-dupe and rank findings so it's not just a wall of noise
+✅ Output format: file, line, severity, explanation, suggested fix, source
+   line (GET /api/projects/{id}/scan, optional ?min_severity=)
+✅ De-dupe and rank findings (sorted high→low; SEC001+SEC002 on the same
+   line collapse into one)
+⬜ Null-deref / taint-style checks — not attempted; rule-based detection of
+   these is noisy, better left to the LLM pass
 
 Notes:
--
+- Uses Python's stdlib `ast` for Python rules (exact, zero dependencies).
+  tree-sitter stays as the cross-language layer — JS/Java rules will use it.
+- Tested on a hand-written sample with 13 planted issues: all caught, and
+  the two decoys (parameterized SQL query, "your_token_here" placeholder)
+  were correctly NOT flagged.
+- Live endpoint verified two ways: plant-disease-detector -> 200 OK, 0
+  findings (clean repo, expected); uploaded vulnerable_demo.py -> real
+  findings returned (hardcoded key, hardcoded db_password, etc.), sorted
+  high -> low. Pattern layer confirmed end to end.
+- GOTCHA (fixed): .gitignore patterns containing a slash (e.g.
+  `data/repos/*`) are anchored to the repo ROOT. Our data folders live in
+  backend/data/, so they were NOT ignored and got committed (Chroma index
+  .bin files, cloned test repos as embedded-repo gitlinks, uploaded test
+  files). Fix: add backend/data/... patterns and `git rm -r --cached` the
+  already-tracked paths. Rule of thumb: if a gitignore rule "isn't
+  working", check whether it's anchored to the wrong directory.
+- Known limits: rules are pattern-based, so expect some false negatives
+  (e.g. SQL string built in one variable and executed later) and the
+  occasional false positive. That's the trade for being fast, free and
+  reproducible. The LLM pass is meant to cover the gaps.
 
 ---
 
