@@ -239,13 +239,26 @@ Notes:
 ---
 
 ## Phase 7 — Fix Generation & Patching
-⬜ Given a bug finding, generate a proposed diff (not full file rewrite —
-   minimal patch)
-⬜ Diff format: unified diff, applyable with `git apply` or similar
-⬜ Explain *why* the fix works, not just what changed
+✅ Given a scanner finding, propose a minimal patch (POST /propose-fix)
+✅ Diff format: unified diff, applies with `git apply` (checked)
+✅ Explain why the fix works, plus warnings about side effects
+✅ Never writes to the project — returns a diff, a human applies it
+
+How it works:
+- We compute the diff ourselves (difflib). The model is never asked for a diff.
+- Deterministic fixes (no LLM): BUG001 bare except, SEC007 weak hash,
+  SEC008 verify=False, SEC009 debug=True.
+- Everything else (SEC001-006, BUG002): the LLM rewrites only the enclosing
+  function/statement; missing stdlib imports are added automatically.
+- Checks before we call a patch `verified`: parses, function name + params
+  unchanged, original finding gone, no new finding types introduced.
+  Failed proposals are still returned with the failed checks listed.
 
 Notes:
--
+- `verified` means the PATTERN is gone, not that behavior is correct. That
+  needs tests running against the patch = Phase 8.
+- SEC007 fix changes hash output (old stored hashes won't match).
+- Fix quality from a 1B model will vary; a bigger local model helps here too.
 
 ---
 
