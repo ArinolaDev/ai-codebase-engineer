@@ -182,16 +182,59 @@ Notes:
 ---
 
 ## Phase 6 — Test Generation
-⬜ Given a function + its signature + surrounding context, generate test
-   cases: normal, edge, invalid input, boundary
-⬜ Language-specific test scaffolding (pytest, jest, junit)
-⬜ Run the generated tests against the actual code to check they at least
-   execute without erroring (before showing them to the user)
+✅ Given a function, generate pytest cases: normal, edge, invalid input,
+   boundary (POST /api/projects/{id}/generate-tests) — verified live with
+   the real llama3.2:1b on pricing_demo.py::calculate_price
+⬜ Language-specific test scaffolding (jest, junit) — Python/pytest only
+⬜ Methods inside classes — only top-level functions supported for now
+✅ Run the generated tests and split into passing / failing (verify=true) —
+   verified live: 200 OK, verified=true, 5 passing, 0 failing, no run_error
 ⬜ Coverage-aware: prioritize untested functions using existing coverage data
    if available
 
 Notes:
--
+- New files: app/testgen/generator.py (extract function with stdlib `ast`,
+  build prompt, clean model output, assemble test file) and
+  app/testgen/runner.py (run pytest in a subprocess, parse results).
+- Verified offline with fake model replies (24 checks, all passing):
+  function extraction incl. decorators; markdown-fence cleanup (closed,
+  unclosed, chatter around it); model's redundant import dropped; wrong
+  expectations land in `failing`; a parametrized test with ONE bad case
+  counts as failed; passing-only file re-runs fully green; invalid-syntax /
+  empty / no-tests replies give clear errors; path traversal rejected;
+  un-importable module and timeouts give a run_error instead of crashing;
+  parent-shell secrets are not visible to the test process.
+- Bug found by those checks and fixed: pytest truncates its one-line
+  failure summary to terminal width, and our long temp path cut the reason
+  off, so every failure said "test failed". Fix: COLUMNS=250 for the
+  subprocess + fallback to the first `E ...` line of each failure block.
+- DESIGN DECISION: a failing generated test means EITHER the test is wrong
+  OR the function has a real bug. We can't tell which automatically, so the
+  API returns the failure reason and says so. Don't silently discard them
+  and don't present them as bugs either.
+- SAFETY (until Phase 8's Docker sandbox): verify=true imports and runs
+  code from the ingested project plus LLM-written code on the host. It is
+  OFF by default; only enable it for projects you trust. In place now:
+  separate process, 30s timeout, minimal environment (no API keys/secrets
+  passed through).
+- Limitation: modules that need uninstalled packages or run code on import
+  (e.g. Streamlit apps like plant-disease-detector's app.py) can't be
+  imported, so verification reports run_error. Pure functions work best.
+- Expect the 1B model to write some wrong tests — that's exactly what the
+  verify step filters. A bigger local model (qwen2.5-coder:7b) would help.
+- LIVE RESULTS: two real runs on calculate_price gave very different
+  output. Run 1 (verify=false) contained several wrong assertions (e.g.
+  expecting calculate_price(50) == 47.80 with no discount, and expecting
+  calculate_price(0) to raise). Run 2 (verify=true) produced 5 tests that
+  all passed. Same model, same function — quality varies run to run, which
+  is the argument for always verifying.
+- LIMITATION OF VERIFICATION: "passes" != "good test". Run 2's
+  normal-input test computed its expected value with the same formula as
+  the function, so it could never catch a wrong formula (a tautology).
+  Mitigation so far: prompt now says to use hand-computed literal expected
+  values. NOT mitigated: the model may still ignore that. Future idea:
+  mutation check — tweak the function (e.g. flip an operator) and keep
+  only tests that then FAIL; tests that still pass are worthless.
 
 ---
 

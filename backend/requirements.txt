@@ -30,3 +30,6 @@ tiktoken
 # --- Utils ---
 python-dotenv
 httpx
+
+# --- Testing (used by test generation to run generated tests) ---
+pytest
