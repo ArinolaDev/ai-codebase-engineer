@@ -147,9 +147,10 @@ Notes:
 ✅ Pattern-based static checks (no LLM): hardcoded secrets/keys, SQL built
    from dynamic strings, eval/exec, os.system/shell=True, pickle/yaml.load,
    weak hashes, verify=False, debug=True, bare except, mutable defaults
-⬜ Layer LLM-based review on top for things static analysis misses (logic
-   bugs, bad error handling, race conditions) — feed it function + its
-   callers/callees from the graph for context
+✅ LLM-based review layer (POST /llm-review): logic bugs, unhandled edge
+   cases. Each claim is grounded: the model must quote the offending line and
+   we check it exists in the real source, else the claim is dropped.
+⬜ Give the reviewer callers/callees as context (needs the dependency graph)
 ✅ Output format: file, line, severity, explanation, suggested fix, source
    line (GET /api/projects/{id}/scan, optional ?min_severity=)
 ✅ De-dupe and rank findings (sorted high→low; SEC001+SEC002 on the same
@@ -158,6 +159,18 @@ Notes:
    these is noisy, better left to the LLM pass
 
 Notes:
+- LLM review live results on bug_demo.py (4 planted logic bugs the scanner
+  can't see): llama3.2:1b flagged 2/4 with 2 false alarms; qwen2.5-coder:3b
+  (after prompt rework) flagged the correct LINE for 4/4, but explanations
+  and severities were sometimes wrong (e.g. is_adult explanation garbled,
+  always-crashing get_last_item rated "low") and it flagged one non-bug.
+  Lesson: model size mattered; "reply ONLY with JSON" made the 3B model
+  answer `[]` every time. Fix that worked: notes-first (short per-check
+  notes), then `FINAL JSON:` + array. `debug: true` returns raw replies.
+- LLM review is labelled `unverified`: a quoted line proves the model pointed
+  at real code, not that its claim is right. 1B model = expect misses and
+  some wrong claims. Pass "model": "qwen2.5-coder:3b" (or :7b) per request
+  after `ollama pull` to try a stronger one. Max 8 functions per call.
 - Uses Python's stdlib `ast` for Python rules (exact, zero dependencies).
   tree-sitter stays as the cross-language layer — JS/Java rules will use it.
 - Tested on a hand-written sample with 13 planted issues: all caught, and
