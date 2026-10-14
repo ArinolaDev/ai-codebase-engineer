@@ -42,6 +42,7 @@ class FixProposal:
     verified: bool
     checks: list[str] = field(default_factory=list)   # what was checked / what failed
     warnings: list[str] = field(default_factory=list)
+    new_source: str = ""           # full patched file (used by the verifier; not shown to users)
 
 
 # --- locating the finding ---------------------------------------------------
@@ -280,7 +281,7 @@ def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=N
                 explanation=why, verified=not failures,
                 checks=failures or ["Patched file parses.", "Original finding is gone.",
                                     "No new findings introduced."],
-                warnings=warnings,
+                warnings=warnings, new_source=new_source,
             )
         # line shape not recognised (e.g. multi-line call): fall through to the LLM
 
@@ -331,5 +332,5 @@ def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=N
         checks=checks_failed or ["Patched file parses.", "Original finding is gone.",
                                  "No new findings introduced.",
                                  "Function name and parameters unchanged."],
-        warnings=warnings,
+        warnings=warnings, new_source=new_source,
     )

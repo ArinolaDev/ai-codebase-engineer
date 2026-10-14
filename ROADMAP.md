@@ -278,16 +278,32 @@ Notes:
 ## Phase 8 — Verification Loop (the hard, interesting part)
 ⬜ Sandboxed execution environment (Docker container per project) to run
    tests safely — never run untrusted/generated code on the host
-⬜ Apply patch → run test suite → capture pass/fail + output
+   (BLOCKED for now: Docker not installed. Everything below runs unsandboxed.)
+✅ Apply patch -> run tests -> compare before/after (POST /verify-fix), done
+   in a temp COPY of the project; the real project is never modified
 ⬜ On failure: feed test output back to the agent, let it retry (cap retries,
    e.g. 3 attempts, to avoid infinite loops / runaway cost)
-⬜ On success: present diff + explanation + test results to user for approval
-   before merging — **never auto-commit without human approval**, at least
-   at this stage
-⬜ Rollback mechanism if something goes wrong
+✅ Present diff + explanation + test results for human approval; nothing is
+   ever auto-applied or auto-committed
+⬜ Rollback mechanism (moot until we actually apply patches ourselves)
+
+How verify-fix works:
+- Tests come from you (`test_code`, e.g. passing_code from /generate-tests)
+  and/or the model (`auto_tests=true`, top-level functions only).
+- Baseline = tests that pass on the ORIGINAL code. After patching, any
+  baseline test that fails is a regression.
+- Verdicts: safe_by_tests | unsafe | untested | rejected (patch failed its
+  own scanner checks, so tests weren't run).
+- Offline-verified: bare-except fix = safe; md5->sha256 fix = flagged unsafe
+  (hash output changed, exactly the side effect the fix warns about);
+  no tests / import error = untested; real file untouched.
 
 Notes:
--
+- safe_by_tests is evidence, not proof: it only covers what the tests cover.
+- Auto tests are characterization tests (pin CURRENT behavior, bugs included),
+  so a fix that legitimately changes behavior shows up as a regression.
+- Runs project code + model-written tests on your machine: subprocess,
+  timeout, minimal env, no sandbox. Trusted projects only until Docker.
 
 ---
 
