@@ -59,13 +59,14 @@ def list_functions(source: str) -> list[tuple[str, int, int]]:
     return out
 
 
-def build_prompt(name: str, numbered_source: str) -> str:
+def build_prompt(name: str, numbered_source: str, context: str = "") -> str:
+    ctx = f"\nContext from the call graph (for understanding only, do not review these):\n{context}\n" if context else ""
     return f"""You are a careful code reviewer. Review this Python function `{name}`.
 
 ```python
 {numbered_source}
 ```
-
+{ctx}
 STEP 1 - Write one short line of notes for each check, using real values from the code:
 1. Empty input (empty list / empty string / 0)
 2. Division by zero
@@ -154,7 +155,8 @@ def ground_findings(items: list[dict], file_path: str, function: str,
 
 def review_file(project_root: str, rel_path: str, function_name: str | None = None,
                 llm=None, model: str | None = None,
-                raw_log: list | None = None) -> tuple[list[ReviewFinding], dict]:
+                raw_log: list | None = None, progress=None,
+                use_context: bool = False) -> tuple[list[ReviewFinding], dict]:
     """Returns (findings, stats). stats = functions_reviewed / skipped / dropped counts."""
     root = Path(project_root).resolve()
     path = (root / rel_path).resolve()
@@ -186,11 +188,22 @@ def review_file(project_root: str, rel_path: str, function_name: str | None = No
     lines = source.splitlines()
     scanner_lines = {f.line for f in scan_python_file(str(path), rel_path)}
 
+    graph = None
+    if use_context:
+        try:
+            from app.analysis.dep_graph import cached_graph
+            graph = cached_graph(str(root))
+        except Exception:
+            graph = None   # context is a bonus; never fail the review because of it
+
+    p = progress or (lambda *a, **k: None)
     findings: list[ReviewFinding] = []
     claimed = 0
-    for name, start, end in funcs:
+    for i, (name, start, end) in enumerate(funcs, start=1):
+        p("review", f"Reviewing {name} ({i}/{len(funcs)})", n=i, of=len(funcs))
         numbered = "\n".join(lines[start - 1:end])   # no numbers: they confuse small models
-        reply = llm(build_prompt(name, numbered), timeout=180.0)
+        ctx = graph.context_for(f"{rel_path}::{name}") if graph else ""
+        reply = llm(build_prompt(name, numbered, ctx), timeout=180.0)
         if raw_log is not None:
             raw_log.append({"function": name, "reply": reply[:2500]})
         items = parse_model_json(reply)

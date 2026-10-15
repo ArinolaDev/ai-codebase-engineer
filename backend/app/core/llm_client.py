@@ -35,3 +35,10 @@ def generate(prompt: str, model: str = DEFAULT_MODEL, timeout: float = 60.0) -> 
 
     data = response.json()
     return data.get("response", "").strip()
+
+
+def llm_for(model: str | None):
+    """A generate-function bound to a specific Ollama model (None = use the default)."""
+    if not model:
+        return None
+    return lambda prompt, timeout=60.0: generate(prompt, model=model, timeout=timeout)

@@ -148,14 +148,15 @@ def find_scope(source: str, line: int) -> tuple[int, int, bool]:
     raise FixError("Couldn't find the code around that line.")
 
 
-def build_prompt(finding: Finding, snippet: str) -> str:
+def build_prompt(finding: Finding, snippet: str, feedback: str | None = None) -> str:
+    retry = (f"\nYour PREVIOUS attempt was rejected. Reason:\n{feedback}\nFix that problem this time.\n" if feedback else "")
     return f"""You are fixing ONE specific problem in Python code.
 
 Problem ({finding.rule_id}): {finding.title}
 Why it is a problem: {finding.explanation}
 Direction for the fix: {finding.suggestion}
 The offending line is: {finding.code}
-
+{retry}
 Code:
 ```python
 {snippet}
@@ -259,7 +260,8 @@ def make_diff(rel_path: str, old: str, new: str) -> str:
 
 # --- public entry point -----------------------------------------------------
 
-def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=None) -> FixProposal:
+def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=None,
+                feedback: str | None = None) -> FixProposal:
     path = _safe_path(project_root, rel_path)
     finding = find_finding(path, rel_path, line, rule_id)
     old_source = path.read_text(encoding="utf-8", errors="replace")
@@ -293,7 +295,7 @@ def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=N
     snippet = "\n".join(old_lines[start - 1:end])
     indent = re.match(r"\s*", old_lines[start - 1]).group(0)
 
-    reply = llm(build_prompt(finding, textwrap.dedent(snippet)), timeout=180.0)
+    reply = llm(build_prompt(finding, textwrap.dedent(snippet), feedback), timeout=180.0)
     new_snippet = _extract_code(reply)
     if not new_snippet.strip():
         raise FixError("The model returned an empty reply. Try again.")

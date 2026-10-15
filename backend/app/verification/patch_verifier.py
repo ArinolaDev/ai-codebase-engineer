@@ -95,8 +95,11 @@ def _top_level_function_at(source: str, line: int) -> str | None:
 
 def verify_fix(project_root: str, rel_path: str, line: int, rule_id: str,
                test_code: str | None = None, auto_tests: bool = False,
-               fix_llm=None, test_llm=None) -> VerifyResult:
-    proposal = propose_fix(project_root, rel_path, line, rule_id, llm=fix_llm)
+               fix_llm=None, test_llm=None, fix_feedback: str | None = None,
+               progress=None) -> VerifyResult:
+    _p = progress or (lambda *a, **k: None)
+    _p("fix", "Proposing a fix")
+    proposal = propose_fix(project_root, rel_path, line, rule_id, llm=fix_llm, feedback=fix_feedback)
     if not proposal.verified:
         return VerifyResult(
             verdict="rejected", proposal=proposal,
@@ -123,6 +126,7 @@ def verify_fix(project_root: str, rel_path: str, line: int, rule_id: str,
             except SyntaxError as e:
                 raise VerifyError(f"Your test_code isn't valid Python (line {e.lineno}: {e.msg}).")
         elif auto_tests:
+            _p("gen_tests", "Asking the model to write tests")
             fn = _top_level_function_at(old_source, line)
             if fn is None:
                 notes.append("auto_tests only supports fixes inside a top-level function; "
@@ -142,6 +146,7 @@ def verify_fix(project_root: str, rel_path: str, line: int, rule_id: str,
                 notes=notes,
             )
 
+        _p("tests_before", "Running tests on the original code")
         before = run_tests(copy_root, code)
         if before.run_error:
             return VerifyResult(
@@ -163,6 +168,7 @@ def verify_fix(project_root: str, rel_path: str, line: int, rule_id: str,
                          + ", ".join(sorted(before.failed)))
 
         target_file.write_text(proposal.new_source, encoding="utf-8")
+        _p("tests_after", "Running the same tests on the patched code")
         after = run_tests(copy_root, baseline)
 
         if after.run_error:

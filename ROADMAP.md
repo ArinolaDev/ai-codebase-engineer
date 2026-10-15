@@ -45,7 +45,7 @@ Notes:
    a second language, so we don't guess the right abstraction prematurely
 ✅ Extract per-file: function/class definitions, imports, parameters,
    docstrings, line ranges
-⬜ Build a dependency graph: file → file (imports), function → function
+✅ Build a dependency graph: file → file (imports), function → function
    (calls) — this is Phase 3 territory now; imports are extracted but not
    yet resolved into an actual graph
 
@@ -75,10 +75,7 @@ Notes:
    (sentence-transformers, all-MiniLM-L6-v2), NOT a hosted/paid API
 ✅ Store in vector DB (Chroma, local/file-persisted), keyed to project_id +
    file path + line range
-⬜ Store the dependency graph separately (file→file imports, function→
-   function calls) — deferred, semantic search alone is working well for
-   now; revisit when codebase chat needs multi-hop questions like "what
-   depends on X"
+✅ Dependency graph built on demand and cached (GET /graph); see Phase 8b
 ⬜ Hybrid retrieval (semantic + graph) — depends on the graph above
 
 Notes:
@@ -109,8 +106,8 @@ Notes:
 ## Phase 4 — Codebase Chat (RAG Q&A)
 ✅ Basic RAG: question → retrieve relevant chunks (Phase 3 search) → LLM
    answers grounded ONLY in retrieved context, with file:line citations
-⬜ Multi-hop questions ("which files depend on X") — needs the dependency
-   graph from Phase 3, still deferred
+⬜ Multi-hop questions ("which files depend on X") — the graph now exists
+   (Phase 8b) but chat does not use it yet
 ⬜ Conversation memory within a session — currently stateless, each
    question is independent. Fine for now; add if follow-up Qs feel broken
 ⬜ Test against a real medium-sized open source repo — only tested against
@@ -150,7 +147,7 @@ Notes:
 ✅ LLM-based review layer (POST /llm-review): logic bugs, unhandled edge
    cases. Each claim is grounded: the model must quote the offending line and
    we check it exists in the real source, else the claim is dropped.
-⬜ Give the reviewer callers/callees as context (needs the dependency graph)
+✅ Give the reviewer callers/callees as context (`use_context: true` on /llm-review; off by default, test whether it helps your model)
 ✅ Output format: file, line, severity, explanation, suggested fix, source
    line (GET /api/projects/{id}/scan, optional ?min_severity=)
 ✅ De-dupe and rank findings (sorted high→low; SEC001+SEC002 on the same
@@ -267,6 +264,9 @@ How it works:
   unchanged, original finding gone, no new finding types introduced.
   Failed proposals are still returned with the failed checks listed.
 
+Extras (added later): structured diff for UIs (hunks, side-by-side rows, +/- stats),
+`git apply` commands, and an `impact` block (who calls the changed function).
+
 Notes:
 - `verified` means the PATTERN is gone, not that behavior is correct. That
   needs tests running against the patch = Phase 8.
@@ -281,8 +281,8 @@ Notes:
    (BLOCKED for now: Docker not installed. Everything below runs unsandboxed.)
 ✅ Apply patch -> run tests -> compare before/after (POST /verify-fix), done
    in a temp COPY of the project; the real project is never modified
-⬜ On failure: feed test output back to the agent, let it retry (cap retries,
-   e.g. 3 attempts, to avoid infinite loops / runaway cost)
+✅ On failure: feed test output back to the agent, let it retry (POST /fix-loop,
+   hard cap 3 attempts; rule-based fixes get 1; every attempt is returned)
 ✅ Present diff + explanation + test results for human approval; nothing is
    ever auto-applied or auto-committed
 ⬜ Rollback mechanism (moot until we actually apply patches ourselves)
@@ -304,6 +304,31 @@ Notes:
   so a fix that legitimately changes behavior shows up as a regression.
 - Runs project code + model-written tests on your machine: subprocess,
   timeout, minimal env, no sandbox. Trusted projects only until Docker.
+
+---
+
+## Phase 8b — Platform features (backend, done before the frontend)
+✅ Live progress: background jobs + Server-Sent Events
+   (POST /jobs/{scan|review|propose-fix|verify-fix|fix-loop} -> job_id;
+   GET /api/jobs/{id}/events streams progress then the result)
+✅ Structured diffs (hunks, side-by-side) + strict patch applier
+✅ Retry loop with failure feedback (max 3 attempts)
+✅ Dependency graph (GET /graph, /graph/function): imports, calls, callers,
+   callees, blast radius, possibly-unused code, import cycles
+✅ GitHub PR (POST /open-pr): dry-run by default, `confirm=true` to publish,
+   token from GITHUB_TOKEN in .env, fork fallback, never pushes to main
+⬜ Report export (PDF), more languages (JS/TS via tree-sitter), scan history,
+   auth/multi-user, Docker sandbox
+
+Notes:
+- Call graph is static and best-effort: exact for same-file calls, self.method(),
+  and imports of project modules; `obj.method()` edges are only added when the
+  method name is unique in the project and are marked `approx: true`.
+- Jobs are in memory (a server restart clears them). Fine for one user.
+- GitHub token: create a fine-grained token with Contents + Pull requests
+  (read/write) for the target repo. Tested against a mock GitHub server only;
+  the first real PR is the real test: use a throwaway repo and dry_run first.
+- Never commit .env (already gitignored).
 
 ---
 

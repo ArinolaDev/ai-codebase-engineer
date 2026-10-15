@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     # Anthropic (optional for now — we won't touch this until Phase 4+)
     anthropic_api_key: str | None = None
 
+    # GitHub (optional): lets the app open pull requests with approved patches
+    github_token: str | None = None
+
     # Database
     database_url: str = "postgresql://postgres:postgres@localhost:5432/codebase_engineer"
 
