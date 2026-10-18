@@ -11,7 +11,7 @@ router = APIRouter()
 class ChatRequest(BaseModel):
     question: str
     top_k: int = 5
-
+    model: str | None = None   # optional Ollama model; default is the small general one
 
 class SourceOut(BaseModel):
     file_path: str
@@ -33,7 +33,7 @@ def chat_with_project(project_id: str, payload: ChatRequest):
         raise HTTPException(404, str(e))
 
     try:
-        result = answer_question(project_id, payload.question, payload.top_k)
+        result = answer_question(project_id, payload.question, payload.top_k, payload.model)
     except LLMError as e:
         raise HTTPException(503, str(e))
 

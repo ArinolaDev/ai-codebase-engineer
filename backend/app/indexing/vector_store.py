@@ -55,7 +55,7 @@ def index_chunks(project_id: str, chunks: list[CodeChunk]) -> int:
     return len(chunks)
 
 
-def search(project_id: str, query: str, top_k: int = 5) -> list[dict]:
+def search(project_id: str, query: str, top_k: int = 5, snippet_chars: int = 500) -> list[dict]:
     collection = get_or_create_collection(project_id)
     results = collection.query(query_texts=[query], n_results=top_k)
 
@@ -69,7 +69,7 @@ def search(project_id: str, query: str, top_k: int = 5) -> list[dict]:
                 "chunk_id": results["ids"][0][i],
                 "distance": results["distances"][0][i],
                 "metadata": results["metadatas"][0][i],
-                "snippet": results["documents"][0][i][:500],
+                "snippet": results["documents"][0][i][:snippet_chars],
             }
         )
     return hits

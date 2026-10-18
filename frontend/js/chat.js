@@ -1,23 +1,29 @@
 import { $, $$, esc, icon, api, toast } from "./util.js";
 import { openCode } from "./codeview.js";
 
+const INDEX_V = 2;   // bump when the index format changes, so older indexes get rebuilt
+const chatModel = (store) => { const ms = (store?.system?.ollama?.models || []).filter((m) => !/embed/i.test(m)); return ms.find((m) => /coder/i.test(m)) || ms.find((m) => /3b|7b|8b/i.test(m)) || undefined; };
 const SUGGEST = ["What does this project do?", "Where is user input handled?", "Which functions touch the database?", "How are errors handled?"];
 
 export async function renderAsk(host, { pid, st, store }) {
   host.innerHTML = `<div class="page tight"><div class="page-head"><div><h1>Ask the code</h1><p>Answers come only from code retrieved from your project, with the exact lines cited.</p></div></div><div id="body"></div></div>`;
   const body = $("#body", host);
-  if (!st.indexed) {   // the index may already exist from an earlier session: probe it
-    try { const hits = await api(`/api/projects/${pid}/search?q=function&top_k=1`); if (hits.length) store.save(pid, "indexed", true); } catch {}
+  if (st.indexed !== INDEX_V) {   // none yet, or one built by an older version (it lacks top-level code like constants and keys)
+    let old = st.indexed === true;
+    if (!old) { try { const hits = await api(`/api/projects/${pid}/search?q=function&top_k=1`); old = hits.length > 0; } catch {} }
+    return setup(old);
   }
-  if (!st.indexed) return setup();
   chat();
 
-  function setup() {
-    body.innerHTML = `<div class="card empty"><h3>Index this project once</h3><p>The app reads every function and class and builds a local search index with free embeddings. It takes about a minute on first use and runs entirely on your machine.</p>
+  function setup(old) {
+    body.innerHTML = old
+      ? `<div class="card empty"><h3>Rebuild the index</h3><p>This project's search index is from an older version, or you asked to refresh it. The new index also covers top-level code such as constants, keys and settings, so questions about them get correct answers. It takes about a minute.</p>
+      <button class="btn primary" id="idx">${icon("play")}Rebuild the index</button><div id="idx-s"></div></div>`
+      : `<div class="card empty"><h3>Index this project once</h3><p>The app reads every function, class and top-level statement and builds a local search index with free embeddings. It takes about a minute on first use and runs entirely on your machine.</p>
       <button class="btn primary" id="idx">${icon("play")}Build the index</button><div id="idx-s"></div></div>`;
     $("#idx", body).onclick = async () => {
       const b = $("#idx", body); b.disabled = true; $("#idx-s", body).innerHTML = `<div class="row muted"><span class="spin"></span>Indexing. The first run also loads the embedding model.</div>`;
-      try { const r = await api(`/api/projects/${pid}/index`, { method: "POST" }); store.save(pid, "indexed", true); toast("Index ready", `${r.chunks_indexed} chunks from ${r.files_processed} files`, "ok"); chat(); }
+      try { const r = await api(`/api/projects/${pid}/index`, { method: "POST" }); store.save(pid, "indexed", INDEX_V); toast("Index ready", `${r.chunks_indexed} chunks from ${r.files_processed} files`, "ok"); chat(); }
       catch (e) { $("#idx-s", body).innerHTML = `<div class="callout" style="border-color:#FF6B6B55"><h4>Indexing failed</h4><p>${esc(e.message)}</p></div>`; b.disabled = false; }
     };
   }
@@ -25,7 +31,8 @@ export async function renderAsk(host, { pid, st, store }) {
   function chat() {
     body.innerHTML = `<div class="chat"><div class="thread" id="thread" aria-live="polite"></div>
       <div class="suggest" id="sg" style="margin-bottom:12px">${SUGGEST.map((q) => `<button>${esc(q)}</button>`).join("")}</div>
-      <form class="composer" id="cf"><input class="input" id="q" placeholder="Ask anything about this codebase" autocomplete="off" aria-label="Question"><button class="btn primary" id="send">${icon("send")}Ask</button></form></div>`;
+      <form class="composer" id="cf"><input class="input" id="q" placeholder="Ask anything about this codebase" autocomplete="off" aria-label="Question"><button class="btn primary" id="send">${icon("send")}Ask</button></form>
+      <div class="muted" style="margin-top:10px;font-size:12px">Changed your code or re-uploaded it? <button type="button" id="reidx" style="background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline">Rebuild the index</button></div></div>`;
     const thread = $("#thread", body);
     const draw = () => { thread.innerHTML = st.chat.length ? st.chat.map((m) => msgHtml(m, pid)).join("") : `<div class="muted" style="margin:auto;text-align:center;max-width:44ch">Ask a question to get started. Try one of the suggestions below.</div>`; $$("[data-src]", thread).forEach((c) => c.onclick = () => { const [f, a, b, n] = c.dataset.src.split("|"); openCode(pid, f, +a, +b, n); }); thread.scrollTop = thread.scrollHeight; };
     draw();
@@ -34,12 +41,13 @@ export async function renderAsk(host, { pid, st, store }) {
       st.chat.push({ role: "user", text: q }); draw();
       thread.insertAdjacentHTML("beforeend", `<div class="msg" id="typing"><div class="bubble typing"><i></i><i></i><i></i></div></div>`); thread.scrollTop = thread.scrollHeight;
       $("#send", body).disabled = true;
-      try { const r = await api(`/api/projects/${pid}/chat`, { method: "POST", body: { question: q, top_k: 5 } }); st.chat.push({ role: "bot", text: r.answer, sources: r.sources }); }
+      try { const r = await api(`/api/projects/${pid}/chat`, { method: "POST", body: { question: q, top_k: 5, model: chatModel(store) } }); st.chat.push({ role: "bot", text: r.answer, sources: r.sources }); }
       catch (e) { st.chat.push({ role: "bot", text: e.message, error: true }); }
       $("#send", body).disabled = false; draw();
     };
     $("#cf", body).onsubmit = (e) => { e.preventDefault(); const i = $("#q", body); const q = i.value; i.value = ""; ask(q); };
     $$("#sg button", body).forEach((b) => b.onclick = () => ask(b.textContent));
+    $("#reidx", body).onclick = () => setup(true);
     $("#q", body).focus();
   }
 }

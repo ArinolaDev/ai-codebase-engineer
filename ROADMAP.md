@@ -370,6 +370,19 @@ Notes:
   GET /api/projects/{id}/files, GET /api/projects/{id}/file?path=
 - Known quirk: chat source paths come from the index as absolute paths; the UI trims them.
 
+### Found in the first real run of the UI (Oct 18) and fixed
+✅ Verifier: the after-patch tests now run in a fresh copy of the project, so files a test leaves
+   behind (a sqlite database, say) can't make a good patch look like a regression
+✅ Ask the code: top-level code (constants, keys, config, imports) is now indexed as "module level"
+   chunks; before, a question like "where is the database password set?" could not find it
+✅ Ask the code: the model now sees up to 1600 characters of each retrieved chunk (was 500), and the
+   UI asks with the best installed model (a coder model if present) instead of the 1B default
+✅ Ask the code: indexes are versioned; an older one shows a "Rebuild the index" card, and there is a
+   "Rebuild the index" link under the chat box
+⬜ Tidy step for model fixes (e.g. a stray `f` left on a string that no longer has placeholders)
+⬜ Remove leftover scaffold folders (frontend/src, public, empty package.json; unused backend folders)
+⬜ Chat: answer from the call graph too ("who calls X?") and re-rank so config chunks are not crowded out
+
 ---
 
 ## Phase 11 — Polish / Productionization (later)
