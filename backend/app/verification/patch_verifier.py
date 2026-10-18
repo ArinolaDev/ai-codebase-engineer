@@ -167,6 +167,15 @@ def verify_fix(project_root: str, rel_path: str, line: int, rule_id: str,
             notes.append(f"{len(before.failed)} test(s) already failed on the original code and were ignored: "
                          + ", ".join(sorted(before.failed)))
 
+        # Start the second run from a FRESH copy. Tests often leave files behind (a sqlite
+        # database, a cache, a temp file); if the first run's leftovers stay in the folder,
+        # a test that passed before the patch can fail after it for reasons that have
+        # nothing to do with the patch. Same path, so the tests need no retargeting.
+        try:
+            shutil.rmtree(copy_root)
+            copy_project(project_root, copy_root)
+        except OSError as e:
+            raise VerifyError(f"Could not reset the temporary copy between test runs: {e}")
         target_file.write_text(proposal.new_source, encoding="utf-8")
         _p("tests_after", "Running the same tests on the patched code")
         after = run_tests(copy_root, baseline)
