@@ -347,14 +347,28 @@ Notes:
 ---
 
 ## Phase 10 — Frontend
-⬜ Project upload / connect repo flow
-⬜ Codebase map visualization (tree + dependency graph view)
-⬜ Findings dashboard (bugs, suggested tests, suggested fixes)
-⬜ Diff viewer with approve/reject
-⬜ Chat interface for codebase Q&A
+✅ Project upload (drag-and-drop zip) and clone-from-GitHub flow, recent projects list
+✅ Overview: stats, language bar, next steps
+✅ Findings dashboard: live scan with progress, severity filters, grouped by file
+✅ Fix workspace: code context, preview fix, verify with tests, fix with retries (attempt picker)
+✅ Diff viewer (unified and side by side), copy / download patch, evidence checklist and verdict
+✅ Blast-radius panel for each fix; open-a-pull-request panel (dry run first)
+✅ Model review tab (live progress, call-graph context option)
+✅ Test lab: generate tests for a function, run them, keep the passing ones
+✅ Dependency map: force-directed graph, click a function for callers / callees / impact
+✅ Ask the code: one-click indexing, chat with clickable source lines
+✅ Served by the FastAPI app itself at /ui/ (plain HTML/CSS/JS, nothing to install)
+⬜ Report export (PDF / Markdown) from the findings page
+⬜ Scan history and comparing two scans
+⬜ Move to React + Vite + TypeScript once the screens are settled (optional; the API stays the same)
+⬜ Real-browser pass on Windows (fonts, drag-and-drop) after first use
 
 Notes:
--
+- Built without a build step on purpose: `uvicorn app.main:app --reload` then open
+  http://127.0.0.1:8000/ . Files live in frontend/ (css/app.css, js/*.js).
+- New backend endpoints for the UI: GET /api/system/status, GET /api/projects,
+  GET /api/projects/{id}/files, GET /api/projects/{id}/file?path=
+- Known quirk: chat source paths come from the index as absolute paths; the UI trims them.
 
 ---
 
