@@ -19,6 +19,7 @@ verified=False and the failed checks listed.
 import ast
 import difflib
 import re
+import sys
 import tempfile
 import textwrap
 from collections import Counter
@@ -194,7 +195,12 @@ def _add_missing_imports(source: str) -> tuple[str, list[str]]:
     missing = sorted((used & _AUTO_IMPORT) - imported)
     if not missing:
         return source, []
+    return _insert_import_lines(source, [f"import {m}" for m in missing]), missing
 
+
+def _insert_import_lines(source: str, statements: list[str]) -> str:
+    """Put import statements after the module docstring / existing imports."""
+    tree = ast.parse(source)
     insert_after = 0
     for n in tree.body:
         if isinstance(n, (ast.Import, ast.ImportFrom)):
@@ -203,8 +209,55 @@ def _add_missing_imports(source: str) -> tuple[str, list[str]]:
               and isinstance(n.value, ast.Constant) and isinstance(n.value.value, str)):
             insert_after = n.end_lineno or n.lineno   # module docstring
     lines = source.splitlines()
-    new_lines = lines[:insert_after] + [f"import {m}" for m in missing] + lines[insert_after:]
-    return "\n".join(new_lines) + ("\n" if source.endswith("\n") else ""), missing
+    new_lines = lines[:insert_after] + statements + lines[insert_after:]
+    return "\n".join(new_lines) + ("\n" if source.endswith("\n") else "")
+
+
+def _import_keys(node) -> set:
+    if isinstance(node, ast.Import):
+        return {("import", a.name, a.asname) for a in node.names}
+    return {("from", node.level, node.module, a.name, a.asname) for a in node.names}
+
+
+def _split_function_and_imports(code: str, file_source: str) -> tuple[str, list[str], int]:
+    """Small models often wrap the fixed function in `import ...` lines. If the reply is exactly one
+    function plus plain standard-library imports, keep the function and return
+    (function_source, imports_the_file_lacks, number_of_import_statements_seen).
+    Anything else (other statements, third-party or relative imports) is returned unchanged,
+    so the single-function check still rejects it."""
+    stdlib = getattr(sys, "stdlib_module_names", frozenset())
+    try:
+        text = textwrap.dedent(code)
+        tree = ast.parse(text)
+    except SyntaxError:
+        return code, [], 0
+    defs = [n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))]
+    imports = [n for n in tree.body if isinstance(n, (ast.Import, ast.ImportFrom))]
+    if len(defs) != 1 or not imports or len(defs) + len(imports) != len(tree.body):
+        return code, [], 0
+
+    def plain_stdlib(n) -> bool:
+        if isinstance(n, ast.ImportFrom):
+            names = [n.module] if (n.module and not n.level) else [None]
+        else:
+            names = [a.name for a in n.names]
+        return all(x and x.split(".")[0] in stdlib and x.split(".")[0] != "__future__" for x in names)
+
+    if not all(plain_stdlib(n) for n in imports):
+        return code, [], 0
+
+    have: set = set()
+    try:
+        for n in ast.parse(file_source).body:
+            if isinstance(n, (ast.Import, ast.ImportFrom)):
+                have |= _import_keys(n)
+    except SyntaxError:
+        pass
+    fn = defs[0]
+    start = min([fn.lineno] + [d.lineno for d in fn.decorator_list])
+    function_src = "\n".join(text.splitlines()[start - 1:fn.end_lineno])
+    missing = [ast.unparse(n) for n in imports if not _import_keys(n) <= have]
+    return function_src, missing, len(imports)
 
 
 # --- verification -----------------------------------------------------------
@@ -333,6 +386,10 @@ def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=N
     new_snippet = _extract_code(reply)
     if not new_snippet.strip():
         raise FixError("The model returned an empty reply. Try again.")
+    extra_imports: list[str] = []
+    seen_imports = 0
+    if is_function:
+        new_snippet, extra_imports, seen_imports = _split_function_and_imports(new_snippet, old_source)
     new_snippet, tidied = _tidy_fstrings(textwrap.dedent(snippet), textwrap.dedent(new_snippet))
     new_snippet = textwrap.indent(new_snippet, indent)
 
@@ -349,9 +406,17 @@ def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=N
     new_lines = old_lines[:start - 1] + new_snippet.splitlines() + old_lines[end:]
     new_source = "\n".join(new_lines) + ("\n" if trailing_nl else "")
     warnings = []
+    if seen_imports:
+        if extra_imports:
+            warnings.append("The model also wrote import line(s) around the function: "
+                            + "; ".join(extra_imports) + ". They were moved to the top of the file.")
+        else:
+            warnings.append("The model repeated import line(s) the file already has; they were left out.")
     if tidied:
         warnings.append(f"Removed a leftover `f` prefix from {tidied} string(s) that no longer have placeholders.")
     try:
+        if extra_imports:
+            new_source = _insert_import_lines(new_source, extra_imports)
         new_source, added = _add_missing_imports(new_source)
         if added:
             warnings.append("Added missing import(s): " + ", ".join(added) + ".")

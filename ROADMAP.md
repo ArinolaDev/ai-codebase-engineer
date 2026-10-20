@@ -381,7 +381,10 @@ Notes:
    "Rebuild the index" link under the chat box
 ✅ Tidy step for model fixes: a leftover `f` on a string that no longer has placeholders is removed
    (only on lines the model wrote, with a warning in the result)
-⬜ Remove leftover scaffold folders (frontend/src, public, empty package.json; unused backend folders)
+✅ Removed leftover scaffold: frontend/src, frontend/public, the empty package.json and backend/app/patcher
+   (agent, db and models stay: they are placeholders for Phase 9 and 11)
+✅ Model fixes wrapped in `import` lines are no longer rejected: the function is kept; standard-library imports
+   the file lacks are added at the top, repeated ones are left out (third-party or other extra code is still rejected)
 ⬜ Chat: answer from the call graph too ("who calls X?") and re-rank so config chunks are not crowded out
 
 ---
