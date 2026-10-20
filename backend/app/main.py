@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api import projects, parsing_routes, indexing_routes, chat_routes, analysis_routes, testgen_routes, fix_routes, review_routes, verify_routes, graph_routes, jobs_routes, github_routes, system_routes
+from app.api import projects, parsing_routes, indexing_routes, chat_routes, analysis_routes, testgen_routes, fix_routes, review_routes, verify_routes, graph_routes, jobs_routes, github_routes, system_routes, report_routes
 
 app = FastAPI(title="AI Codebase Engineer", version="0.1.0")
 
@@ -33,6 +33,7 @@ app.include_router(graph_routes.router, prefix="/api/projects", tags=["graph"])
 app.include_router(github_routes.router, prefix="/api/projects", tags=["github"])
 app.include_router(jobs_routes.router, prefix="/api/projects", tags=["jobs"])
 app.include_router(jobs_routes.jobs_router, prefix="/api/jobs", tags=["jobs"])
+app.include_router(report_routes.router, prefix="/api/projects", tags=["report"])
 app.include_router(system_routes.router, prefix="/api/system", tags=["system"])
 
 

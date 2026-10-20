@@ -358,7 +358,7 @@ Notes:
 ✅ Dependency map: force-directed graph, click a function for callers / callees / impact
 ✅ Ask the code: one-click indexing, chat with clickable source lines
 ✅ Served by the FastAPI app itself at /ui/ (plain HTML/CSS/JS, nothing to install)
-⬜ Report export (PDF / Markdown) from the findings page
+✅ Report export (PDF / Markdown) from the findings page
 ⬜ Scan history and comparing two scans
 ⬜ Move to React + Vite + TypeScript once the screens are settled (optional; the API stays the same)
 ⬜ Real-browser pass on Windows (fonts, drag-and-drop) after first use
@@ -369,23 +369,6 @@ Notes:
 - New backend endpoints for the UI: GET /api/system/status, GET /api/projects,
   GET /api/projects/{id}/files, GET /api/projects/{id}/file?path=
 - Known quirk: chat source paths come from the index as absolute paths; the UI trims them.
-
-### Found in the first real run of the UI (Oct 18) and fixed
-✅ Verifier: the after-patch tests now run in a fresh copy of the project, so files a test leaves
-   behind (a sqlite database, say) can't make a good patch look like a regression
-✅ Ask the code: top-level code (constants, keys, config, imports) is now indexed as "module level"
-   chunks; before, a question like "where is the database password set?" could not find it
-✅ Ask the code: the model now sees up to 1600 characters of each retrieved chunk (was 500), and the
-   UI asks with the best installed model (a coder model if present) instead of the 1B default
-✅ Ask the code: indexes are versioned; an older one shows a "Rebuild the index" card, and there is a
-   "Rebuild the index" link under the chat box
-✅ Tidy step for model fixes: a leftover `f` on a string that no longer has placeholders is removed
-   (only on lines the model wrote, with a warning in the result)
-✅ Removed leftover scaffold: frontend/src, frontend/public, the empty package.json and backend/app/patcher
-   (agent, db and models stay: they are placeholders for Phase 9 and 11)
-✅ Model fixes wrapped in `import` lines are no longer rejected: the function is kept; standard-library imports
-   the file lacks are added at the top, repeated ones are left out (third-party or other extra code is still rejected)
-⬜ Chat: answer from the call graph too ("who calls X?") and re-rank so config chunks are not crowded out
 
 ---
 
