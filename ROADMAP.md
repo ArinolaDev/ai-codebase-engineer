@@ -379,7 +379,8 @@ Notes:
    UI asks with the best installed model (a coder model if present) instead of the 1B default
 ✅ Ask the code: indexes are versioned; an older one shows a "Rebuild the index" card, and there is a
    "Rebuild the index" link under the chat box
-⬜ Tidy step for model fixes (e.g. a stray `f` left on a string that no longer has placeholders)
+✅ Tidy step for model fixes: a leftover `f` on a string that no longer has placeholders is removed
+   (only on lines the model wrote, with a warning in the result)
 ⬜ Remove leftover scaffold folders (frontend/src, public, empty package.json; unused backend folders)
 ⬜ Chat: answer from the call graph too ("who calls X?") and re-rank so config chunks are not crowded out
 

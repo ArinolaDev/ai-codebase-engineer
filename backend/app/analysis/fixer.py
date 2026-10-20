@@ -234,6 +234,40 @@ def verify_fix(old_source: str, new_source: str, finding: Finding) -> list[str]:
     return failures
 
 
+def _tidy_fstrings(old: str, new: str) -> tuple[str, int]:
+    """Drop the `f` from f-strings that have no {placeholders}, but only on lines the model wrote
+    or changed (code it didn't touch is never edited). Small models often turn
+    f"... {x}" into "... ?" and forget the `f`: harmless to run, but a linter error."""
+    try:
+        tree = ast.parse(new)
+    except SyntaxError:
+        return new, 0
+    old_lines, new_lines = old.splitlines(), new.splitlines()
+    changed: set[int] = set()
+    for tag, _, _, j1, j2 in difflib.SequenceMatcher(None, old_lines, new_lines).get_opcodes():
+        if tag in ("replace", "insert"):
+            changed.update(range(j1 + 1, j2 + 1))
+
+    edits: list[tuple[int, int]] = []          # (line index, byte column of the `f`)
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.JoinedStr) or node.lineno != node.end_lineno or node.lineno not in changed:
+            continue
+        if any(isinstance(v, ast.FormattedValue) for v in node.values):
+            continue
+        raw = new_lines[node.lineno - 1].encode("utf-8")
+        seg = raw[node.col_offset:node.end_col_offset]
+        m = re.match(rb"([A-Za-z]{1,2})['\"]", seg)
+        if not m or b"f" not in m.group(1).lower() or b"{" in seg or b"}" in seg:
+            continue                            # braces here are {{escapes}}: leave them alone
+        edits.append((node.lineno - 1, node.col_offset + m.group(1).lower().index(b"f")))
+
+    for idx, pos in sorted(set(edits), key=lambda e: (e[0], -e[1])):
+        raw = new_lines[idx].encode("utf-8")
+        new_lines[idx] = (raw[:pos] + raw[pos + 1:]).decode("utf-8")
+    out = "\n".join(new_lines) + ("\n" if new.endswith("\n") else "")
+    return out, len(set(edits))
+
+
 def _signature(source: str):
     """(name, [param names]) of the single top-level def in `source`, or None."""
     try:
@@ -299,7 +333,8 @@ def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=N
     new_snippet = _extract_code(reply)
     if not new_snippet.strip():
         raise FixError("The model returned an empty reply. Try again.")
-    new_snippet = textwrap.indent(textwrap.dedent(new_snippet), indent)
+    new_snippet, tidied = _tidy_fstrings(textwrap.dedent(snippet), textwrap.dedent(new_snippet))
+    new_snippet = textwrap.indent(new_snippet, indent)
 
     checks_failed = []
     if is_function:
@@ -314,6 +349,8 @@ def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=N
     new_lines = old_lines[:start - 1] + new_snippet.splitlines() + old_lines[end:]
     new_source = "\n".join(new_lines) + ("\n" if trailing_nl else "")
     warnings = []
+    if tidied:
+        warnings.append(f"Removed a leftover `f` prefix from {tidied} string(s) that no longer have placeholders.")
     try:
         new_source, added = _add_missing_imports(new_source)
         if added:
