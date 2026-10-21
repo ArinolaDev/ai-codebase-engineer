@@ -326,8 +326,9 @@ Notes:
   method name is unique in the project and are marked `approx: true`.
 - Jobs are in memory (a server restart clears them). Fine for one user.
 - GitHub token: create a fine-grained token with Contents + Pull requests
-  (read/write) for the target repo. Tested against a mock GitHub server only;
-  the first real PR is the real test: use a throwaway repo and dry_run first.
+  (read/write) for the target repo, saved in backend/.env as GITHUB_TOKEN.
+  Verified for real (Oct 22): dry run passed, then a real PR was opened on a
+  private throwaway repo with an honest "untested" description.
 - Never commit .env (already gitignored).
 
 ---
