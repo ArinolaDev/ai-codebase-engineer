@@ -35,6 +35,10 @@ export async function openFix(pid, f) {
       <div id="run"></div><div id="out" style="display:flex;flex-direction:column;gap:18px"></div>
     </div>`;
   document.body.append(scrim, dr);
+  if (!/\.py$/i.test(f.file_path)) {   // automatic fixes are Python only for now
+    $(".drawer-b .card", dr).style.display = "none"; $(".actions-bar", dr).style.display = "none";
+    $("#run", dr).insertAdjacentHTML("beforebegin", `<div class="callout"><h4>Fix by hand for now</h4><p>Automatic fixes, tests and the dependency map work on Python files only. This finding is a real scanner result, so use the explanation and the suggested direction above to change the code yourself.</p></div>`);
+  }
   const close = () => closeFix(); scrim.onclick = close; $("#dr-x", dr).onclick = close;
   document.addEventListener("keydown", escClose);
 

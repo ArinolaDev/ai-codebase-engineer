@@ -349,6 +349,10 @@ def make_diff(rel_path: str, old: str, new: str) -> str:
 
 def propose_fix(project_root: str, rel_path: str, line: int, rule_id: str, llm=None,
                 feedback: str | None = None) -> FixProposal:
+    if not rel_path.lower().endswith(".py"):
+        raise FixError(
+            "Automatic fixes work on Python files only for now. This finding is still real: "
+            "the explanation and suggested fix on the finding tell you what to change by hand.")
     path = _safe_path(project_root, rel_path)
     finding = find_finding(path, rel_path, line, rule_id)
     old_source = path.read_text(encoding="utf-8", errors="replace")

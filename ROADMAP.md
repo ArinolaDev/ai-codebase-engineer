@@ -317,7 +317,9 @@ Notes:
    callees, blast radius, possibly-unused code, import cycles
 ✅ GitHub PR (POST /open-pr): dry-run by default, `confirm=true` to publish,
    token from GITHUB_TOKEN in .env, fork fallback, never pushes to main
-⬜ Report export (PDF), more languages (JS/TS via tree-sitter), scan history,
+✅ JavaScript / TypeScript: parsing (tree-sitter), 17 scanner rules, report, chat index (Oct 22).
+   Fixes, test lab and dependency map are still Python only.
+⬜ Report export (PDF) is done; more languages (Java, Go...), scan history,
    auth/multi-user, Docker sandbox
 
 Notes:

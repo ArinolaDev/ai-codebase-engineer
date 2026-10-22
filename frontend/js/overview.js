@@ -22,7 +22,7 @@ export async function renderOverview(host, { pid, st, go }) {
   <div class="two">
     <div style="display:flex;flex-direction:column;gap:18px">
       <div class="card">
-        <div class="card-h"><h2>Languages</h2><span class="sub">${langs.length} detected</span><span class="right muted" style="font-size:12.5px">Deep analysis supports Python today</span></div>
+        <div class="card-h"><h2>Languages</h2><span class="sub">${langs.length} detected</span><span class="right muted" style="font-size:12.5px">Scanning: Python, JavaScript, TypeScript. Fixes and map: Python</span></div>
         <div class="card-b">
           <div class="lang-bar" role="img" aria-label="Language breakdown">${langs.map(([l, c], i) => `<i style="width:${(c / total) * 100}%;background:${LANG_COLORS[i % LANG_COLORS.length]}" title="${esc(l)} ${c}"></i>`).join("")}</div>
           <div class="lang-key">${langs.map(([l, c], i) => `<span><s style="background:${LANG_COLORS[i % LANG_COLORS.length]}"></s>${esc(l)} <b class="mono" style="color:var(--text)">${c}</b></span>`).join("")}</div>
@@ -50,7 +50,7 @@ function step(ic, title, desc, href, label, done) {
 }
 function topFindings(scan, pid) {
   const top = scan.findings.slice(0, 6);
-  if (!top.length) return `<div class="empty"><h3>Nothing flagged</h3><p>The scanner found no issues in ${scan.files_scanned} Python file(s). The model review can still catch logic bugs.</p></div>`;
+  if (!top.length) return `<div class="empty"><h3>Nothing flagged</h3><p>The scanner found no issues in ${scan.files_scanned} file(s). The model review can still catch logic bugs.</p></div>`;
   return `<div class="findings">${top.map((f) => `<a class="finding" href="#/p/${pid}/findings" style="color:inherit;text-decoration:none"><span class="bar ${f.severity}"></span>
     <div><div class="t">${esc(f.title)} <span class="pill ${f.severity}">${sevLabel[f.severity]}</span></div><div class="loc">${esc(f.file_path)}:${f.line}</div></div><span class="go">${icon("chev", 16)}</span></a>`).join("")}</div>`;
 }

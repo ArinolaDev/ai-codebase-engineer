@@ -3,7 +3,7 @@ Builds a shareable report from a project's scan: Markdown (for repos, tickets, c
 self-contained, print-friendly HTML page (open it, press Ctrl+P, choose "Save as PDF").
 
 Read-only: it scans the project and describes what it found. Nothing is changed.
-Python only for now, like the scanner itself.
+Covers every language the scanner covers (Python, JavaScript, TypeScript).
 """
 
 from __future__ import annotations
@@ -13,7 +13,8 @@ import re
 from collections import Counter, defaultdict
 from datetime import datetime
 
-from app.analysis.pattern_scanner import scan_python_file, sort_findings
+from app.analysis.pattern_scanner import sort_findings
+from app.analysis.scan_dispatch import SCAN_LANGUAGES, scan_file
 from app.ingestion.file_walker import summarize_languages, walk_project
 
 SEVERITIES = ["high", "medium", "low"]
@@ -29,11 +30,11 @@ SEV_MEANING = {
 
 def build_report_data(project_root: str, project_id: str, min_severity: str = "low") -> dict:
     files = walk_project(project_root)
-    py_files = [f for f in files if f.language == "python"]
+    py_files = [f for f in files if f.language in SCAN_LANGUAGES]
 
     findings = []
     for f in py_files:
-        findings.extend(scan_python_file(f.absolute_path, f.path))
+        findings.extend(scan_file(f.absolute_path, f.path, f.language))
     findings = sort_findings(findings)
     order = {s: i for i, s in enumerate(SEVERITIES)}
     findings = [f for f in findings if order[f.severity] <= order[min_severity]]
@@ -79,7 +80,7 @@ def _pretty_node(node_id: str) -> str:
 
 def _headline(d: dict) -> str:
     if not d["files_scanned"]:
-        return "No Python files were found, so nothing was scanned."
+        return "No Python, JavaScript or TypeScript files were found, so nothing was scanned."
     if not d["total"]:
         return "The scanner found no issues in this project."
     h, m, l = (d["by_severity"][s] for s in SEVERITIES)
@@ -99,13 +100,19 @@ LIMITS = [
     "and blind to everything else, so a clean report is not a guarantee of safe code.",
     "Logic bugs (wrong results, off-by-one errors) are not found by this scan. The model review in the app "
     "looks for those, but its findings are leads to check, not facts.",
-    "Only Python files are analysed. Other languages are listed but not scanned.",
+    "Python, JavaScript and TypeScript files are scanned. Other languages are listed but not scanned. Automatic fixes and the dependency map cover Python only for now.",
     "The call graph is static and approximate: calls made through variables, callbacks or reflection can be "
     "missed, so \"possibly unused\" means \"nothing in the project visibly calls it\".",
 ]
 
 
 # --------------------------------------------------------------------------- markdown
+
+def _code_lang(path: str) -> str:
+    ext = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+    return {"py": "python", "js": "javascript", "jsx": "javascript", "mjs": "javascript",
+            "cjs": "javascript", "ts": "typescript", "tsx": "tsx"}.get(ext, "")
+
 
 def _fence(code: str) -> str:
     longest = max((len(m) for m in re.findall(r"`+", code)), default=0)
@@ -119,12 +126,12 @@ def _md_cell(text: str) -> str:
 def render_markdown(d: dict) -> str:
     out: list[str] = []
     out += [f"# Code review report", "",
-            f"Project `{d['project_id']}` · generated {d['generated']} · rule-based scanner (Python)", "",
+            f"Project `{d['project_id']}` · generated {d['generated']} · rule-based scanner (Python, JavaScript, TypeScript)", "",
             f"> {_headline(d)}", ""]
 
     out += ["## Summary", "", "| | |", "|---|---|",
             f"| Files in project | {d['files_total']} |",
-            f"| Python files scanned | {d['files_scanned']} |",
+            f"| Files scanned | {d['files_scanned']} |",
             f"| High | {d['by_severity']['high']} |",
             f"| Medium | {d['by_severity']['medium']} |",
             f"| Low | {d['by_severity']['low']} |", ""]
@@ -145,7 +152,7 @@ def render_markdown(d: dict) -> str:
                 fence = _fence(code)
                 out += [f"#### {n}. {f['title']} (`{f['rule_id']}`)", "",
                         f"`{f['file_path']}:{f['line']}`", "",
-                        f"{fence}python", code, fence, "",
+                        f"{fence}{_code_lang(f['file_path'])}", code, fence, "",
                         f"**Why it matters:** {f['explanation']}", "",
                         f"**Suggested fix:** {f['suggestion']}", ""]
 
@@ -234,12 +241,12 @@ def render_html(d: dict) -> str:
 <button onclick="window.print()">Print / Save as PDF</button></div>
 <main class="page">
 <h1>Code review report</h1>
-<div class="meta">Project <code>{_e(d['project_id'])}</code> &middot; generated {_e(d['generated'])} &middot; rule-based scanner (Python)</div>
+<div class="meta">Project <code>{_e(d['project_id'])}</code> &middot; generated {_e(d['generated'])} &middot; rule-based scanner (Python, JavaScript, TypeScript)</div>
 <p class="headline">{_e(_headline(d))}</p>""")
 
     tot = max(d["total"], 1)
     h.append('<div class="tiles">'
-             f'<div class="tile"><div class="n">{d["files_scanned"]}</div><div class="l">Python files scanned (of {d["files_total"]})</div></div>'
+             f'<div class="tile"><div class="n">{d["files_scanned"]}</div><div class="l">Files scanned (of {d["files_total"]})</div></div>'
              + "".join(f'<div class="tile {s}"><div class="n">{d["by_severity"][s]}</div><div class="l">{SEV_LABEL[s]} severity</div></div>' for s in SEVERITIES)
              + "</div>")
     if d["total"]:

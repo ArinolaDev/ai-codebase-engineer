@@ -14,7 +14,7 @@ export async function renderFindings(host, ctx) {
 
   // ----- scanner -----
   async function runScan() {
-    const run = progressPanel($("#run", pane), "Scanning your Python files");
+    const run = progressPanel($("#run", pane), "Scanning your code");
     try {
       const res = await runJob(pid, "scan", { min_severity: "low" }, run.update);
       run.end(true); store.save(pid, "scan", res);
@@ -33,7 +33,7 @@ export async function renderFindings(host, ctx) {
     const byFile = {}; list.forEach((f) => (byFile[f.file_path] ||= []).push(f));
     pane.innerHTML = `<div id="run"></div>
       <div class="toolbar"><span class="seg">${[["all", "All", scan.total_findings], ["high", "High", scan.by_severity.high], ["medium", "Medium", scan.by_severity.medium], ["low", "Low", scan.by_severity.low]].map(([k, l, n]) => `<button data-sev="${k}" aria-pressed="${sev === k}">${l}<span class="c">${n}</span></button>`).join("")}</span>
-        <span class="muted" style="font-size:13px">${scan.files_scanned} Python file${scan.files_scanned === 1 ? "" : "s"} scanned</span>
+        <span class="muted" style="font-size:13px">${scan.files_scanned} file${scan.files_scanned === 1 ? "" : "s"} scanned</span>
         <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
           <a class="btn sm" href="/api/projects/${pid}/report?format=html" target="_blank" rel="noopener" title="Opens a printable page: choose Save as PDF">${icon("download")}Report (PDF)</a>
           <a class="btn sm" href="/api/projects/${pid}/report?format=md" download title="Download as a Markdown file">${icon("download")}Markdown</a>

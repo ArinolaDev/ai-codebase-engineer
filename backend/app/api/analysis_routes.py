@@ -3,7 +3,8 @@ from pydantic import BaseModel
 
 from app.ingestion.ingest_service import get_project_path, IngestError
 from app.ingestion.file_walker import walk_project
-from app.analysis.pattern_scanner import scan_python_file, sort_findings
+from app.analysis.pattern_scanner import sort_findings
+from app.analysis.scan_dispatch import SCAN_LANGUAGES, scan_file
 
 router = APIRouter()
 
@@ -29,7 +30,7 @@ class ScanResponse(BaseModel):
 
 @router.get("/{project_id}/scan", response_model=ScanResponse)
 def scan_project(project_id: str, min_severity: str = "low"):
-    """Run the deterministic pattern scanner over every Python file.
+    """Run the deterministic pattern scanner over every Python, JavaScript and TypeScript file.
     min_severity: 'high' | 'medium' | 'low' (default shows everything)."""
     if min_severity not in ("high", "medium", "low"):
         raise HTTPException(400, "min_severity must be high, medium, or low")
@@ -39,11 +40,11 @@ def scan_project(project_id: str, min_severity: str = "low"):
     except IngestError as e:
         raise HTTPException(404, str(e))
 
-    files = [f for f in walk_project(str(project_path)) if f.language == "python"]
+    files = [f for f in walk_project(str(project_path)) if f.language in SCAN_LANGUAGES]
 
     findings = []
     for f in files:
-        findings.extend(scan_python_file(f.absolute_path, f.path))
+        findings.extend(scan_file(f.absolute_path, f.path, f.language))
     findings = sort_findings(findings)
 
     order = {"high": 0, "medium": 1, "low": 2}

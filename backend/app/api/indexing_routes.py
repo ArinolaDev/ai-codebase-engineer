@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app.ingestion.ingest_service import get_project_path, IngestError
 from app.ingestion.file_walker import walk_project
-from app.parsing.python_parser import parse_python_file
+from app.parsing.dispatch import PARSE_LANGUAGES, parse_file
 from app.indexing.chunker import chunk_parsed_file
 from app.indexing.vector_store import index_chunks, search, reset_project_index
 
@@ -37,11 +37,11 @@ def build_index(project_id: str):
     reset_project_index(project_id)  # clean slate on re-index
 
     files = walk_project(str(project_path))
-    python_files = [f for f in files if f.language == "python"]
+    python_files = [f for f in files if f.language in PARSE_LANGUAGES]
 
     total_chunks = 0
     for f in python_files:
-        parsed = parse_python_file(f.absolute_path)
+        parsed = parse_file(f.absolute_path, f.language)
         chunks = chunk_parsed_file(parsed, f.absolute_path)
         total_chunks += index_chunks(project_id, chunks)
 

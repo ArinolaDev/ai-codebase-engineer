@@ -10,7 +10,8 @@ from pydantic import BaseModel, ValidationError
 from app.core.jobs import store
 from app.ingestion.file_walker import walk_project
 from app.ingestion.ingest_service import get_project_path, IngestError
-from app.analysis.pattern_scanner import scan_python_file, sort_findings
+from app.analysis.pattern_scanner import sort_findings
+from app.analysis.scan_dispatch import SCAN_LANGUAGES, scan_file
 from app.api.fix_routes import FixRequest, run_propose_fix
 from app.api.review_routes import ReviewRequest, run_review
 from app.api.verify_routes import VerifyFixRequest, FixLoopRequest, run_verify_fix, run_fix_loop
@@ -27,11 +28,11 @@ def run_scan(project_root: str, payload: ScanRequest, progress) -> dict:
     order = {"high": 0, "medium": 1, "low": 2}
     if payload.min_severity not in order:
         raise ValueError("min_severity must be high, medium, or low")
-    files = [f for f in walk_project(project_root) if f.language == "python"]
+    files = [f for f in walk_project(project_root) if f.language in SCAN_LANGUAGES]
     findings = []
     for i, f in enumerate(files, start=1):
         progress("scan", f"Scanning {f.path} ({i}/{len(files)})", n=i, of=len(files))
-        findings.extend(scan_python_file(f.absolute_path, f.path))
+        findings.extend(scan_file(f.absolute_path, f.path, f.language))
     findings = [f for f in sort_findings(findings) if order[f.severity] <= order[payload.min_severity]]
     by_sev = {"high": 0, "medium": 0, "low": 0}
     for f in findings:
