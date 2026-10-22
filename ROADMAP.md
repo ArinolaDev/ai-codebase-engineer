@@ -318,7 +318,10 @@ Notes:
 ✅ GitHub PR (POST /open-pr): dry-run by default, `confirm=true` to publish,
    token from GITHUB_TOKEN in .env, fork fallback, never pushes to main
 ✅ JavaScript / TypeScript: parsing (tree-sitter), 17 scanner rules, report, chat index (Oct 22).
-   Fixes, test lab and dependency map are still Python only.
+   JS/TS fixes (Oct 22): instant rule fixes for secrets, ==, debugger, empty catch, md5, TLS,
+   string timers; model fixes (same guards as Python) for SQL, eval, shell, innerHTML.
+   Verification says "Passes static checks only" (no Jest/Node test runner yet).
+   Test lab and dependency map are still Python only.
 ⬜ Report export (PDF) is done; more languages (Java, Go...), scan history,
    auth/multi-user, Docker sandbox
 

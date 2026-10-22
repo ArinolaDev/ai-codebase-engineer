@@ -106,6 +106,13 @@ def verify_fix(project_root: str, rel_path: str, line: int, rule_id: str,
             summary="The proposed patch failed its own checks, so it was not tried against tests.",
         )
 
+    if not rel_path.lower().endswith(".py"):
+        return VerifyResult(
+            verdict="untested", proposal=proposal,
+            summary="The patch passes the scanner's checks (it parses, the finding is gone, nothing new appeared), "
+                    "but JavaScript/TypeScript tests can't be run here yet, so behavior was not tested.",
+        )
+
     notes: list[str] = []
     old_source = (Path(project_root).resolve() / rel_path).read_text(encoding="utf-8", errors="replace")
 

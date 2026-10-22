@@ -4,6 +4,7 @@ import { diffView, verdictCard, verdictOf } from "./diff.js";
 import { store } from "./app.js";
 
 const RULE_FIXES = new Set(["BUG001", "SEC007", "SEC008", "SEC009"]);
+const JS_RULE_FIXES = new Set(["SEC001", "SEC002", "SEC007", "SEC008", "BUG003", "BUG004", "BUG005"]);
 
 export async function openFix(pid, f) {
   closeFix();
@@ -11,7 +12,8 @@ export async function openFix(pid, f) {
   const dr = document.createElement("aside"); dr.className = "drawer"; dr.id = "drawer"; dr.setAttribute("role", "dialog"); dr.setAttribute("aria-label", "Fix workspace");
   const models = (store.system?.ollama?.models || []);
   const def = store.system?.ollama?.default_model || "llama3.2:1b";
-  const ruleBased = RULE_FIXES.has(f.rule_id);
+  const isJs = !/\.py$/i.test(f.file_path);
+  const ruleBased = (isJs ? JS_RULE_FIXES : RULE_FIXES).has(f.rule_id);
   dr.innerHTML = `
     <div class="drawer-h"><div><h2>${esc(f.title)}</h2><div class="row" style="gap:8px;margin-top:8px"><span class="pill ${f.severity}">${sevLabel[f.severity]}</span><span class="pill">${esc(f.rule_id)}</span><span class="loc">${esc(f.file_path)}:${f.line}</span></div></div>
       <button class="x" aria-label="Close" id="dr-x">${icon("x")}</button></div>
@@ -22,23 +24,19 @@ export async function openFix(pid, f) {
       <div class="card" style="border-radius:var(--r)"><div class="card-b" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:16px">
         <div class="field"><label for="fx-model">Model for the fix${ruleBased ? " (only used if the rule fix can't apply)" : ""}</label>
           <select class="select" id="fx-model">${(models.length ? models : [def]).map((m) => `<option ${m.includes("qwen2.5-coder") ? "selected" : ""}>${esc(m)}</option>`).join("")}</select></div>
-        <div class="field"><label>Proof</label><label class="row" style="gap:8px;color:var(--text-2);font-size:13.5px;min-height:40px"><input type="checkbox" id="fx-auto"> Let the model write tests for this function</label></div>
-        <details style="grid-column:1/-1"><summary class="muted" style="cursor:pointer;font-size:13px">Use my own pytest code instead</summary>
+        <div class="field" ${isJs ? 'style="display:none"' : ""}><label>Proof</label><label class="row" style="gap:8px;color:var(--text-2);font-size:13.5px;min-height:40px"><input type="checkbox" id="fx-auto"> Let the model write tests for this function</label></div>
+        <details style="grid-column:1/-1;${isJs ? "display:none" : ""}"><summary class="muted" style="cursor:pointer;font-size:13px">Use my own pytest code instead</summary>
           <textarea class="textarea" id="fx-tests" style="margin-top:10px" placeholder="import pytest&#10;from module import function&#10;&#10;def test_example():&#10;    assert function(1) == 1"></textarea></details>
       </div></div>
 
       <div class="actions-bar">
         <button class="act" data-kind="propose-fix"><b>${icon("wrench")}Preview fix</b><span>${ruleBased ? "Instant. A rule-based fix, checked for syntax." : "The model rewrites the function. Takes a minute or two."}</span></button>
-        <button class="act" data-kind="verify-fix"><b>${icon("flask")}Verify with tests</b><span>Run tests on a copy before and after the patch to catch regressions.</span></button>
+        <button class="act" data-kind="verify-fix"><b>${icon("flask")}Verify with tests</b><span>${isJs ? "Checks the patch with the scanner. JavaScript tests can't run here yet." : "Run tests on a copy before and after the patch to catch regressions."}</span></button>
         <button class="act ${ruleBased ? "" : "rec"}" data-kind="fix-loop"><b>${icon("refresh")}Fix with retries</b><span>If a model's patch fails, the failure is fed back and it tries again, up to 3 times.</span></button>
       </div>
       <div id="run"></div><div id="out" style="display:flex;flex-direction:column;gap:18px"></div>
     </div>`;
   document.body.append(scrim, dr);
-  if (!/\.py$/i.test(f.file_path)) {   // automatic fixes are Python only for now
-    $(".drawer-b .card", dr).style.display = "none"; $(".actions-bar", dr).style.display = "none";
-    $("#run", dr).insertAdjacentHTML("beforebegin", `<div class="callout"><h4>Fix by hand for now</h4><p>Automatic fixes, tests and the dependency map work on Python files only. This finding is a real scanner result, so use the explanation and the suggested direction above to change the code yourself.</p></div>`);
-  }
   const close = () => closeFix(); scrim.onclick = close; $("#dr-x", dr).onclick = close;
   document.addEventListener("keydown", escClose);
 
