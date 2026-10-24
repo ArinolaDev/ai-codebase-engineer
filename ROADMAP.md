@@ -322,7 +322,9 @@ Notes:
    string timers; model fixes (same guards as Python) for SQL, eval, shell, innerHTML.
    Verification says "Passes static checks only" (no Jest/Node test runner yet).
    Test lab and dependency map are still Python only.
-⬜ Report export (PDF) is done; more languages (Java, Go...), scan history,
+✅ Scan history (Oct 24): every scan saved per project (last 30), compared with the previous
+   one (new / fixed), History tab on the Findings page. Identical rescans don't pile up.
+⬜ More languages (Java, Go...),
    auth/multi-user, Docker sandbox
 
 Notes:

@@ -10,6 +10,9 @@ from pydantic import BaseModel, ValidationError
 from app.core.jobs import store
 from app.ingestion.file_walker import walk_project
 from app.ingestion.ingest_service import get_project_path, IngestError
+from pathlib import Path
+
+from app.analysis import history
 from app.analysis.pattern_scanner import sort_findings
 from app.analysis.scan_dispatch import SCAN_LANGUAGES, scan_file
 from app.api.fix_routes import FixRequest, run_propose_fix
@@ -37,8 +40,14 @@ def run_scan(project_root: str, payload: ScanRequest, progress) -> dict:
     by_sev = {"high": 0, "medium": 0, "low": 0}
     for f in findings:
         by_sev[f.severity] += 1
-    return {"files_scanned": len(files), "total_findings": len(findings),
-            "by_severity": by_sev, "findings": [asdict(f) for f in findings]}
+    result = {"files_scanned": len(files), "total_findings": len(findings),
+              "by_severity": by_sev, "findings": [asdict(f) for f in findings]}
+    try:   # history is a bonus: a failure here must never fail the scan itself
+        if payload.min_severity == "low":
+            result["history"] = history.record_scan(Path(project_root).resolve().name, result)
+    except Exception:
+        pass
+    return result
 
 
 # kind -> (request model, runner(project_root, payload, progress))

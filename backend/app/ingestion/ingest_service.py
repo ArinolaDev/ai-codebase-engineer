@@ -77,3 +77,5 @@ def get_project_path(project_id: str) -> Path:
 
 def delete_project(project_id: str) -> None:
     shutil.rmtree(_project_dir(project_id), ignore_errors=True)
+    from app.analysis import history   # lazy: keep this module light
+    history.clear(project_id)
