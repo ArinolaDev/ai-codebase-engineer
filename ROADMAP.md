@@ -317,13 +317,15 @@ Notes:
    callees, blast radius, possibly-unused code, import cycles
 ✅ GitHub PR (POST /open-pr): dry-run by default, `confirm=true` to publish,
    token from GITHUB_TOKEN in .env, fork fallback, never pushes to main
-✅ JavaScript / TypeScript: parsing (tree-sitter), 17 scanner rules, report, chat index (Oct 22).
+✅ JavaScript / TypeScript: parsing (tree-sitter), 12 scanner rules, report, chat index (Oct 22).
    JS/TS fixes (Oct 22): instant rule fixes for secrets, ==, debugger, empty catch, md5, TLS,
    string timers; model fixes (same guards as Python) for SQL, eval, shell, innerHTML.
    Verification says "Passes static checks only" (no Jest/Node test runner yet).
    Test lab and dependency map are still Python only.
 ✅ Scan history (Oct 24): every scan saved per project (last 30), compared with the previous
    one (new / fixed), History tab on the Findings page. Identical rescans don't pile up.
+✅ Release polish (Oct 24): README with screenshots, start.bat / start.ps1 (one-click Windows start),
+   backend/.env.example, MIT license.
 ⬜ More languages (Java, Go...),
    auth/multi-user, Docker sandbox
 
