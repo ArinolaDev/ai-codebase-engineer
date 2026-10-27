@@ -36,3 +36,4 @@ backend/data/indexes/*
 .DS_Store
 .vscode/
 *.log
+backend/data/history/
