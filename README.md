@@ -113,8 +113,6 @@ ROADMAP.md        what was built, in order, and what is left
 - **The call graph is static and approximate.** Dynamic calls and reflection are invisible to it.
 - **Chat sees the best few matches**, so broad questions ("explain the whole app") get partial answers.
 - **Single user, local only.** There is no login. Do not expose port 8000 to a network.
-- **The Docker files** in this repository have not been tested with the current version. Use the Windows start script or the manual steps above.
-
 ## Roadmap
 
 See [ROADMAP.md](ROADMAP.md). Next ideas: run JavaScript tests for verification, chat that follows the call graph, more languages, a sandbox for running tests.
